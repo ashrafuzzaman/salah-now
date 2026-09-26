@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salah Now Preview</title>
+<script type="importmap">
+{
+  "imports": {
+    "@system.app": "/preview/shims/app.js",
+    "@system.router": "/preview/shims/router.js",
+    "@system.storage": "/preview/shims/storage.js",
+    "@system.geolocation": "/preview/shims/geolocation.js"
+  }
+}
+</script>
+<style>
+  :root { --bg: #f2f2f4; --fg: #1d1d1f; --muted: #6e6e73; --panel: #ffffff; --line: #d8d8dc; --accent: #0a7d55; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161618; --fg: #ececf0; --muted: #9a9aa2; --panel: #202024; --line: #34343a; --accent: #3ddc97; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px; display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+
+  /* Watch body; screen is the Fit 4 Pro's 408x480 panel at 1:1 CSS px, scaled to fit. */
+  .watch { padding: 22px; border-radius: 88px; background: linear-gradient(145deg, #3a3a3e, #121214); box-shadow: 0 20px 50px rgba(0,0,0,.35); align-self: flex-start; }
+  .screen-wrap { width: 408px; height: 480px; border-radius: 70px; overflow: hidden; background: #000; position: relative; touch-action: none; user-select: none; cursor: pointer; }
+  @media (max-width: 520px) { .watch { transform: scale(.72); transform-origin: top center; margin-bottom: -150px; } }
+  .exited { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #777; font: 24px system-ui; background: #000; }
+
+  /* Lite-wearable default box model */
+  #screen { width: 100%; height: 100%; font-family: "HarmonyOS Sans", -apple-system, system-ui, sans-serif; color: #fff; }
+  #screen .lw-div { display: flex; flex-direction: row; flex-shrink: 0; border: 0 solid transparent; }
+  #screen .lw-text { display: block; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+  #screen .lw-progress { flex-shrink: 0; background: #333; border-radius: 99px; overflow: hidden; }
+  #screen .lw-progress > i { display: block; height: 100%; background: currentColor; border-radius: 99px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: 340px; max-width: 100%; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+  .panel h2:first-of-type { margin-top: 0; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  input[type=datetime-local] { width: 100%; }
+  .clock { font-variant-numeric: tabular-nums; font-weight: 600; margin-top: 8px; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  ul { margin: 0; padding-left: 18px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div class="watch"><div class="screen-wrap" id="wrap"><div id="screen"></div></div></div>
+
+  <div class="panel">
+    <h1>Salah Now preview</h1>
+    <p>This runs the real <code>src/</code> pages with browser stand-ins for the watch APIs. The screen is 408×480 (Watch Fit 4 Pro size).</p>
+
+    <h2>Gestures</h2>
+    <ul>
+      <li><b>Click</b>: tap</li>
+      <li><b>Hold</b> ~0.6s: long-press (opens settings)</li>
+      <li><b>Drag right</b>: swipe right (exit / back)</li>
+    </ul>
+    <div class="btns" style="margin-top:8px">
+      <button data-gesture="longpress">Long-press</button>
+      <button data-gesture="swipe">Swipe right</button>
+      <button id="restart">Restart app</button>
+    </div>
+
+    <h2>Simulated time</h2>
+    <input type="datetime-local" id="when" step="60">
+    <div class="btns" style="margin-top:8px">
+      <button id="live">Live</button>
+      <button data-jump="3:00">03:00</button>
+      <button data-jump="6:30">06:30</button>
+      <button data-jump="10:00">10:00</button>
+      <button data-jump="13:30">13:30</button>
+      <button data-jump="17:00">17:00</button>
+      <button data-jump="19:30">19:30</button>
+      <button data-jump="22:00">22:00</button>
+    </div>
+    <div class="clock" id="clock"></div>
+
+    <h2>Reset</h2>
+    <div class="btns"><button id="reset">Clear saved settings</button></div>
+  </div>
+</main>
+
+<script type="module">
+// ---- Simulated clock: override Date so the app sees a shifted "now". ----
+const RealDate = Date;
+let offset = 0;
+class SimDate extends RealDate {
+  constructor(...a) { a.length ? super(...a) : super(RealDate.now() + offset); }
+  static now() { return RealDate.now() + offset; }
+}
+window.Date = SimDate;
+
+// ---- Minimal HML renderer ----
+const screen = document.getElementById('screen');
+const pageStyle = document.createElement('style');
+document.head.appendChild(pageStyle);
+let page = null, tpl = null, exited = false, currentUri = 'pages/index/index';
+
+function evalExpr(expr, ctx) {
+  try { return new Function('ctx', 'with (ctx) { return (' + expr + '); }')(ctx); }
+  catch (e) { return ''; }
+}
+function interp(str, ctx) {
+  const whole = str.match(/^\s*\{\{([^{}]+)\}\}\s*$/);
+  if (whole) return evalExpr(whole[1], ctx);
+  return str.replace(/\{\{(.+?)\}\}/g, (_, e) => { const v = evalExpr(e, ctx); return v == null ? '' : v; });
+}
+
+function renderNode(node, ctx, out) {
+  if (node.nodeType === 3) {
+    const t = node.textContent.trim();
+    if (t) out.push(document.createTextNode(interp(t, ctx)));
+    return;
+  }
+  if (node.nodeType !== 1) return;
+  const forExpr = node.getAttribute('for');
+  if (forExpr) {
+    const list = interp(forExpr, ctx) || [];
+    list.forEach((item, idx) => renderEl(node, Object.assign(Object.create(ctx), { $item: item, $idx: idx }), out));
+    return;
+  }
+  if (node.hasAttribute('if') && !interp(node.getAttribute('if'), ctx)) return;
+  renderEl(node, ctx, out);
+}
+
+function renderEl(node, ctx, out) {
+  const tag = node.tagName.toLowerCase();
+  const el = document.createElement('div');
+  el.className = 'lw-' + tag;
+  for (const { name, value } of node.attributes) {
+    if (name === 'class') el.className += ' ' + interp(value, ctx);
+    else if (name === 'style') el.setAttribute('style', interp(value, ctx));
+    else if (name === 'show') { if (!interp(value, ctx)) el.style.display = 'none'; }
+    else if (name.startsWith('on')) el.dataset[name] = value;
+  }
+  if (tag === 'progress') {
+    const fill = document.createElement('i');
+    fill.style.width = (+interp(node.getAttribute('percent') || '0', ctx) || 0) + '%';
+    el.appendChild(fill);
+  } else {
+    const kids = [];
+    node.childNodes.forEach((c) => renderNode(c, ctx, kids));
+    kids.forEach((k) => el.appendChild(k));
+  }
+  out.push(el);
+}
+
+function paint() {
+  if (!page || !tpl || exited) return;
+  const out = [];
+  tpl.content.childNodes.forEach((c) => renderNode(c, page, out));
+  screen.replaceChildren(...out);
+}
+
+async function load(uri) {
+  if (page && page.onDestroy) page.onDestroy();
+  currentUri = uri;
+  const bust = '?t=' + RealDate.now();
+  const [hml, css, mod] = await Promise.all([
+    fetch('/src/' + uri + '.hml' + bust).then((r) => r.text()),
+    fetch('/src/' + uri + '.css' + bust).then((r) => r.text()),
+    import('/src/' + uri + '.js' + bust)
+  ]);
+  pageStyle.textContent = css.replace(/(^|\})\s*([^{}@]+)\{/g, (m, b, sel) =>
+    b + ' ' + sel.split(',').map((s) => '#screen ' + s.trim()).join(', ') + ' {');
+  tpl = document.createElement('template');
+  tpl.innerHTML = hml;
+  const def = mod.default;
+  page = JSON.parse(JSON.stringify(def.data || {}));
+  for (const k in def) if (typeof def[k] === 'function') page[k] = def[k];
+  page.onInit && page.onInit();
+  page.onShow && page.onShow();
+  paint();
+}
+
+window.__watch = {
+  load,
+  exit() {
+    if (page && page.onDestroy) page.onDestroy();
+    exited = true;
+    screen.innerHTML = '<div class="exited">App exited, click to relaunch</div>';
+  }
+};
+
+// Repaint continuously; the app mutates its data from timers and callbacks.
+setInterval(paint, 200);
+
+// ---- Gestures (resolved via elementFromPoint so re-renders don't break them) ----
+const wrap = document.getElementById('wrap');
+let down = null, pressTimer = null, suppressClick = false;
+
+function fire(attr, x, y, arg) {
+  let el = document.elementFromPoint(x, y);
+  el = el && el.closest('[data-' + attr + ']');
+  if (!el || !screen.contains(el)) return false;
+  const fn = page[el.dataset[attr]];
+  if (fn) { fn.call(page, arg || {}); paint(); }
+  return true;
+}
+function centre() { const r = screen.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+
+wrap.addEventListener('pointerdown', (e) => {
+  if (exited) { exited = false; load('pages/index/index'); return; }
+  down = { x: e.clientX, y: e.clientY };
+  suppressClick = false;
+  pressTimer = setTimeout(() => { suppressClick = true; fire('onlongpress', down.x, down.y); }, 600);
+});
+wrap.addEventListener('pointermove', (e) => {
+  if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) clearTimeout(pressTimer);
+});
+wrap.addEventListener('pointerup', (e) => {
+  clearTimeout(pressTimer);
+  if (!down) return;
+  const dx = e.clientX - down.x, dy = e.clientY - down.y;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    fire('onswipe', down.x, down.y, { direction: dx > 0 ? 'right' : 'left' });
+  } else if (Math.abs(dy) > 50) {
+    fire('onswipe', down.x, down.y, { direction: dy > 0 ? 'down' : 'up' });
+  } else if (!suppressClick) {
+    fire('onclick', e.clientX, e.clientY);
+  }
+  down = null;
+});
+
+document.querySelector('[data-gesture=longpress]').onclick = () => fire('onlongpress', ...centre());
+document.querySelector('[data-gesture=swipe]').onclick = () => fire('onswipe', ...centre(), { direction: 'right' });
+document.getElementById('restart').onclick = () => { exited = false; load('pages/index/index'); };
+document.getElementById('reset').onclick = () => {
+  try { localStorage.clear(); } catch (e) {}
+  location.reload();
+};
+
+// ---- Time controls ----
+const when = document.getElementById('when');
+const clock = document.getElementById('clock');
+function pad(n) { return String(n).padStart(2, '0'); }
+function toLocalInput(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+function setSim(target) {
+  offset = target ? target.getTime() - RealDate.now() : 0;
+  if (page) { page.schedule = null; }   // force the page to recompute for the new time
+  paint();
+}
+when.addEventListener('change', () => { if (when.value) setSim(new RealDate(when.value)); });
+document.getElementById('live').onclick = () => setSim(null);
+document.querySelectorAll('[data-jump]').forEach((b) => b.onclick = () => {
+  const [h, m] = b.dataset.jump.split(':').map(Number);
+  const d = new RealDate(RealDate.now() + offset);
+  d.setHours(h, m, 0, 0);
+  setSim(d);
+});
+setInterval(() => {
+  const now = new SimDate();
+  clock.textContent = (offset ? 'Simulated: ' : 'Live: ') + now.toLocaleString();
+  if (document.activeElement !== when) when.value = toLocalInput(now);
+}, 250);
+
+load(currentUri);
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+# signing material — never commit
+*.p12
+*.csr
+*.cer
+*.p7b

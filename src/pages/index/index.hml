@@ -1,0 +1,20 @@
+<div class="container" onswipe="onSwipe" onlongpress="openSettings">
+  <div class="main" show="{{showMain}}" onclick="toggleView">
+    <text class="label">{{currentLabel}}</text>
+    <text class="prayer">{{currentName}}</text>
+    <text class="caption">{{endsCaption}}</text>
+    <text class="countdown">{{remaining}}</text>
+    <progress class="bar" type="horizontal" percent="{{progress}}"></progress>
+    <text class="label">NEXT</text>
+    <text class="next">{{nextName}} {{nextTime}}</text>
+    <text class="hint">tap: all times</text>
+  </div>
+  <div class="list" show="{{showList}}" onclick="toggleView">
+    <text class="title">{{place}}</text>
+    <div class="row" for="{{rows}}">
+      <text class="{{$item.nameCls}}">{{$item.name}}</text>
+      <text class="{{$item.timeCls}}">{{$item.time}}</text>
+    </div>
+    <text class="hint">hold: settings</text>
+  </div>
+</div>

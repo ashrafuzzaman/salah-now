@@ -1,0 +1,16 @@
+{
+  "name": "salah-now",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Prayer times + countdown for Huawei watches and bands (HarmonyOS lite wearable)",
+  "type": "module",
+  "scripts": {
+    "test": "TZ=Asia/Kuala_Lumpur node --test test/*.test.mjs",
+    "times": "node scripts/times.mjs",
+    "sync": "node scripts/sync-to-deveco.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "devDependencies": {
+    "adhan": "^4.4.3"
+  }
+}

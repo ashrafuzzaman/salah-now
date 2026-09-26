@@ -1,0 +1,20 @@
+<div class="container" onswipe="onSwipe">
+  <text class="title">SETTINGS</text>
+  <div class="item" onclick="cycleMethod">
+    <text class="key">Method</text>
+    <text class="value">{{methodLabel}}</text>
+  </div>
+  <div class="item" onclick="toggleAsr">
+    <text class="key">Asr</text>
+    <text class="value">{{asrLabel}}</text>
+  </div>
+  <div class="item" onclick="toggleClock">
+    <text class="key">Clock</text>
+    <text class="value">{{clockLabel}}</text>
+  </div>
+  <div class="item" onclick="updateLocation">
+    <text class="key">Location (tap: GPS)</text>
+    <text class="value">{{locationLabel}}</text>
+  </div>
+  <text class="done" onclick="goBack">Done</text>
+</div>
